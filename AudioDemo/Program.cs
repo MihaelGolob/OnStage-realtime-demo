@@ -16,14 +16,14 @@ public class Program {
         // setup microphone recorder
         var captureDevice = new MMDeviceEnumerator().GetDefaultAudioEndpoint(DataFlow.Capture, Role.Console);
         var recorder = new WasapiCapture(captureDevice);
-        recorder.WaveFormat = new WaveFormat(48000, 32, 2);
+        recorder.WaveFormat = new WaveFormat(44100, 32, 2);
         recorder.DataAvailable += RecorderOnDataAvailable;
         
         // create buffer
         _buffer = new BufferedWaveProvider(recorder.WaveFormat);
         var effectProvider = new EffectWaveProvider(_buffer.ToSampleProvider().ToMono());
         Console.WriteLine($"WaveFormat: {effectProvider.WaveFormat}");
-
+        
         // setup playback
         using var player = new WasapiOut(AudioClientShareMode.Shared, 0);
         player.Init(effectProvider);
