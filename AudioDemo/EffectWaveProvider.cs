@@ -6,7 +6,7 @@ public class EffectWaveProvider : ISampleProvider {
     // private variables
     private readonly ISampleProvider? _source;
     private float[] _beatSample;
-    private bool _coolDown;
+    private int _coolDown;
     
     // public properties
     public WaveFormat? WaveFormat => _source?.WaveFormat; 
@@ -31,8 +31,8 @@ public class EffectWaveProvider : ISampleProvider {
         var read = _source?.Read(buffer, offset, count) ?? 0;
         if (count <= 0) return 0;
 
-        if (_coolDown) {
-            _coolDown = false;
+        if (_coolDown > 0) {
+            _coolDown -= read;
             return read;
         }
         
@@ -55,11 +55,19 @@ public class EffectWaveProvider : ISampleProvider {
         const float dynamicThreshold = 3f;
 
         // insert the beat if the condition is met
-        for (var i = 0; i < _beatSample.Length; i++) {
+        for (var i = 0; i < absWave.Length; i++) {
             var index = i + offset;
             if (index >= buffer.Length) break;
-
-            absWave[0] = 0;
+            
+            if (absWave[i] > Math.Max(smoothWave[i] * dynamicThreshold, minThreshold)) {
+                // insert the beat
+                for (var j = 0; j < _beatSample.Length; j++) {
+                    _coolDown = WaveFormat?.SampleRate / 10 ?? 1000;
+                    var beatIndex = j + index;
+                    if (beatIndex >= buffer.Length) break;
+                    buffer[beatIndex] = _beatSample[j];
+                }
+            }
         }
         #endregion
         
