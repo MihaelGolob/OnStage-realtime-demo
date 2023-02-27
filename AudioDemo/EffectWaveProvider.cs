@@ -7,6 +7,7 @@ public class EffectWaveProvider : ISampleProvider {
     private readonly ISampleProvider? _source;
     private float[] _beatSample;
     private int _coolDown;
+    private int _beatIndex = -1;
     
     // public properties
     public WaveFormat? WaveFormat => _source?.WaveFormat; 
@@ -28,9 +29,24 @@ public class EffectWaveProvider : ISampleProvider {
     }
 
     public int Read(float[] buffer, int offset, int count) {
+        // TODO: refactor this mess
         var read = _source?.Read(buffer, offset, count) ?? 0;
         if (count <= 0) return 0;
 
+        
+        if (_beatIndex >= 0) {
+            while (_beatIndex < _beatSample.Length && _beatIndex + offset < buffer.Length) {
+                buffer[_beatIndex + offset] = _beatSample[_beatIndex];
+                _beatIndex++;
+            }
+            
+            if (_beatIndex >= _beatSample.Length) {
+                _beatIndex = -1;
+            }
+
+            return read;
+        }
+        
         if (_coolDown > 0) {
             _coolDown -= read;
             return read;
@@ -52,7 +68,7 @@ public class EffectWaveProvider : ISampleProvider {
         }
         
         const float minThreshold = 0.01f;
-        const float dynamicThreshold = 3f;
+        const float dynamicThreshold = 5f;
 
         // insert the beat if the condition is met
         for (var i = 0; i < absWave.Length; i++) {
@@ -60,13 +76,8 @@ public class EffectWaveProvider : ISampleProvider {
             if (index >= buffer.Length) break;
             
             if (absWave[i] > Math.Max(smoothWave[i] * dynamicThreshold, minThreshold)) {
-                // insert the beat
-                for (var j = 0; j < _beatSample.Length; j++) {
-                    _coolDown = WaveFormat?.SampleRate / 10 ?? 1000;
-                    var beatIndex = j + index;
-                    if (beatIndex >= buffer.Length) break;
-                    buffer[beatIndex] = _beatSample[j];
-                }
+                _coolDown = WaveFormat?.SampleRate ?? 1000;
+                _beatIndex = 0;
             }
         }
         #endregion
