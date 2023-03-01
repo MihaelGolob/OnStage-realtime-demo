@@ -12,11 +12,16 @@ public class EffectWaveProvider : ISampleProvider {
     // public properties
     public WaveFormat? WaveFormat => _source?.WaveFormat; 
     
-    private void GetSample(string path, WaveFormat format) {
+    private void GetSample(string path, WaveFormat format, float volume) {
         using var clip = new WaveFileReader(path);
+        // resample it to the correct format
         var resampler = new MediaFoundationResampler(clip, format).ToSampleProvider();
-        _beatSample = new float[2407]; // 2407 is the length of the sample
+        _beatSample = new float[56396]; // 2211 is the length of the sample
         resampler.Read(_beatSample, 0, _beatSample.Length);
+        // apply volume
+        for (var i = 0; i < _beatSample.Length; i++) {
+            _beatSample[i] *= volume;
+        }
     }
     
     #region Public API
@@ -25,7 +30,7 @@ public class EffectWaveProvider : ISampleProvider {
         _source = source;
         _beatSample = Array.Empty<float>();
         
-        GetSample("click2.wav", _source.WaveFormat);
+        GetSample("kick.wav", _source.WaveFormat, 5);
     }
 
     public int Read(float[] buffer, int offset, int count) {
@@ -35,11 +40,15 @@ public class EffectWaveProvider : ISampleProvider {
 
         
         if (_beatIndex >= 0) {
-            while (_beatIndex < _beatSample.Length && _beatIndex + offset < buffer.Length) {
-                buffer[_beatIndex + offset] = _beatSample[_beatIndex];
+            var index = offset;
+            // insert the beat sample
+            while (_beatIndex < _beatSample.Length && index < buffer.Length) {
+                buffer[index] = _beatSample[_beatIndex];
                 _beatIndex++;
+                index++;
             }
             
+            // reset the beat index
             if (_beatIndex >= _beatSample.Length) {
                 _beatIndex = -1;
             }
@@ -76,7 +85,7 @@ public class EffectWaveProvider : ISampleProvider {
             if (index >= buffer.Length) break;
             
             if (absWave[i] > Math.Max(smoothWave[i] * dynamicThreshold, minThreshold)) {
-                _coolDown = WaveFormat?.SampleRate ?? 1000;
+                _coolDown = _beatSample.Length;
                 _beatIndex = 0;
             }
         }

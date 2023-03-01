@@ -1,7 +1,6 @@
 ﻿using AudioDemo;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
-using NAudio.Wave.SampleProviders;
 
 public class Program {
     private static BufferedWaveProvider? _buffer;
@@ -22,11 +21,13 @@ public class Program {
         // create buffer
         _buffer = new BufferedWaveProvider(recorder.WaveFormat);
         var effectProvider = new EffectWaveProvider(_buffer.ToSampleProvider().ToMono());
-        Console.WriteLine($"WaveFormat: {effectProvider.WaveFormat}");
+        Console.WriteLine("WaveFormat: {effectProvider.WaveFormat}");
+        
+        var provider = new VolumeSampleProvider(effectProvider, 5f);
         
         // setup playback
         using var player = new WasapiOut(AudioClientShareMode.Shared, 0);
-        player.Init(effectProvider);
+        player.Init(provider);
 
         Console.WriteLine("Recording ...");
         // start playing & recording
