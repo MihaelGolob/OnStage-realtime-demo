@@ -6,7 +6,6 @@ public class EffectWaveProvider : ISampleProvider {
     // private variables
     private readonly ISampleProvider? _source;
     private float[] _beatSample;
-    private int _coolDown;
     private int _beatIndex = -1;
     
     // public properties
@@ -38,12 +37,12 @@ public class EffectWaveProvider : ISampleProvider {
         var read = _source?.Read(buffer, offset, count) ?? 0;
         if (count <= 0) return 0;
 
-        
+        #region Beat insertion
         if (_beatIndex >= 0) {
             var index = offset;
             // insert the beat sample
             while (_beatIndex < _beatSample.Length && index < buffer.Length) {
-                buffer[index] = _beatSample[_beatIndex];
+                buffer[index] += _beatSample[_beatIndex];
                 _beatIndex++;
                 index++;
             }
@@ -55,26 +54,15 @@ public class EffectWaveProvider : ISampleProvider {
 
             return read;
         }
+        #endregion
         
-        if (_coolDown > 0) {
-            _coolDown -= read;
-            return read;
-        }
-        
-        #region BEAT DETECTION
+        #region beat detection 
         // create wave with absolute values
-        var absWave = new float[read];
-        for (var i = 0; i < read; i++) {
-            absWave[i] = Math.Abs(buffer[i]);
-        }
+        var absWave = buffer.Abs(); 
         
         // smooth the wave with a moving average (lowpass filter)
         const float smoothFactor = 0.5f;
-        var smoothWave = new float[read];
-        smoothWave[0] = buffer[0];
-        for (var i = 1; i < smoothWave.Length; i++) {
-            smoothWave[i] = smoothFactor * absWave[i] + (1 - smoothFactor) * smoothWave[i - 1];
-        }
+        var smoothWave = absWave.Lowpass(smoothFactor); 
         
         const float minThreshold = 0.01f;
         const float dynamicThreshold = 5f;
@@ -85,7 +73,6 @@ public class EffectWaveProvider : ISampleProvider {
             if (index >= buffer.Length) break;
             
             if (absWave[i] > Math.Max(smoothWave[i] * dynamicThreshold, minThreshold)) {
-                _coolDown = _beatSample.Length;
                 _beatIndex = 0;
             }
         }
